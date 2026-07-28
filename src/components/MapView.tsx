@@ -84,7 +84,6 @@ export function MapView({ mode = 'WALK', start, end }: MapViewProps) {
 
   return (
     <div id="map-container" className="w-full h-full absolute inset-0 z-10 bg-gray-100">
-      {/* 지도 렌더링 컨테이너 */}
     </div>
   );
 }
