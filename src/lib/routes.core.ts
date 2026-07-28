@@ -37,7 +37,6 @@ export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2
 
 // 도보/차량 선택 모드에 따른 이동 시간(분) 계산 함수
 export function calculateDuration(distanceMeters: number, mode: 'WALK' | 'CAR'): number {
-  // 도보 시속 약 4km/h, 차량 시속 약 30km/h 기준 반영
   const speedMetersPerMinute = mode === 'WALK' ? 67 : 500;
   const durationMinutes = Math.ceil(distanceMeters / speedMetersPerMinute);
   return Math.max(durationMinutes, 1);
@@ -123,4 +122,14 @@ export function generateRouteOptions(
       description: '목적지까지 가장 빠르게 도달할 수 있는 직선 위주의 경로입니다.',
     },
   ];
+}
+
+// 외부 함수(routes.functions.ts 등)에서 요구하는 호환용 함수 추가
+export function computeRoutes(start: Coordinate, end: Coordinate, mode: 'WALK' | 'CAR' = 'WALK'): RouteOption[] {
+  return generateRouteOptions(start, end, mode);
+}
+
+export function computeFastest(start: Coordinate, end: Coordinate, mode: 'WALK' | 'CAR' = 'WALK'): RouteOption {
+  const options = generateRouteOptions(start, end, mode);
+  return options.find(opt => opt.id === 'fast-1') || options[0];
 }
