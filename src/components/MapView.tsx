@@ -1,55 +1,23 @@
-import { useEffect, useRef } from "react";
-import { loadKakaoMaps } from "@/lib/gmaps";
-
-export function MapView({
-  center = { lat: 37.5636, lng: 126.99 },
-  zoom = 3,
-  onMap,
-  className,
-}: {
-  center?: { lat: number; lng: number };
-  zoom?: number;
-  onMap?: (m: any) => void;
-  className?: string;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadKakaoMaps().then((kakao) => {
-      if (cancelled || !ref.current) return;
-
-      const options = {
-        center: new kakao.maps.LatLng(center.lat, center.lng),
-        level: zoom,
-      };
-
-      const map = new kakao.maps.Map(ref.current, options);
-      mapRef.current = map;
-      onMap?.(map);
-
-      // 전국 어디서든 사용자의 현재 위치로 지도 중심 이동
-      if (typeof navigator !== "undefined" && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (cancelled) return;
-            const moveLatLng = new kakao.maps.LatLng(
-              pos.coords.latitude,
-              pos.coords.longitude
-            );
-            map.setCenter(moveLatLng);
-          },
-          () => {},
-          { enableHighAccuracy: true, timeout: 8000 }
-        );
-      }
-    });
-
-    return () => {
-      cancelled = true;
+// src/components/MapView.tsx 예시 수정
+useEffect(() => {
+  if (window.kakao && window.kakao.maps) {
+    const container = document.getElementById('map');
+    const options = {
+      center: new window.kakao.maps.LatLng(37.566826, 126.978656),
+      level: 3
     };
-  }, []);
+    const map = new window.kakao.maps.Map(container, options);
 
-  return <div ref={ref} className={className ?? "h-full w-full"} />;
-}
+    // ★ 핵심: 모바일/반응형 환경에서 지도가 깨지거나 안 뜨는 현상 방지
+    setTimeout(() => {
+      map.relayout();
+    }, 500);
+
+    // 윈도우 사이즈가 바뀔 때도 relayout 실행
+    const handleResize = () => {
+      map.relayout();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }
+}, []);
