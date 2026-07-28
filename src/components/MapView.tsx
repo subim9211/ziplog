@@ -33,7 +33,6 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
           const map = new window.kakao.maps.Map(container, options);
           mapRef.current = map;
 
-          // 출발지 마커
           if (start) {
             const startPosition = new window.kakao.maps.LatLng(start.lat, start.lng);
             new window.kakao.maps.Marker({
@@ -42,7 +41,6 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
             });
           }
 
-          // 목적지 마커
           if (end) {
             const endPosition = new window.kakao.maps.LatLng(end.lat, end.lng);
             new window.kakao.maps.Marker({
@@ -51,7 +49,7 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
             });
           }
 
-          // 모바일 환경에서 지도가 회색으로 깨지거나 렌더링되지 않는 문제 방지
+          // 모바일 환경 대응 레이아웃 재조정
           setTimeout(() => {
             if (mapRef.current) {
               mapRef.current.relayout();
@@ -75,7 +73,6 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
     }
   }, [start, end, mode]);
 
-  // 창 크기 변경 시 모바일 화면 대응 리사이즈 처리
   useEffect(() => {
     const handleResize = () => {
       if (mapRef.current) {
@@ -88,7 +85,7 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
 
   return (
     <div id="map-container" className="w-full h-full absolute inset-0 z-10 bg-gray-100">
-      {/* 카카오맵이 렌더링되는 컨테이너 */}
+      {/* 지도 렌더링 컨테이너 */}
     </div>
   );
 }
