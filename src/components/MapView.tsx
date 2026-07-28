@@ -12,7 +12,8 @@ declare global {
   }
 }
 
-export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
+// export default 대신 export function으로 변경
+export function MapView({ mode = 'WALK', start, end }: MapViewProps) {
   const mapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -49,7 +50,6 @@ export default function MapView({ mode = 'WALK', start, end }: MapViewProps) {
             });
           }
 
-          // 모바일 환경 대응 레이아웃 재조정
           setTimeout(() => {
             if (mapRef.current) {
               mapRef.current.relayout();
