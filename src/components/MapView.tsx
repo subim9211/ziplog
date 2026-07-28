@@ -12,7 +12,6 @@ declare global {
   }
 }
 
-// export default 대신 export function으로 변경
 export function MapView({ mode = 'WALK', start, end }: MapViewProps) {
   const mapRef = useRef<any>(null);
 
