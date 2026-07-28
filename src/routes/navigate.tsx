@@ -1,210 +1,84 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { loadKakaoMaps } from "@/lib/gmaps";
-import { useRouteStore, useGuardian, useWardTrack } from "@/lib/store";
+import React, { useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import MapView from '@/components/MapView';
+import { calculateDistance, generateRouteOptions, RouteOption } from '@/lib/routes.core';
 
-export const Route = createFileRoute("/navigate")({
-  head: () => ({
-    meta: [
-      { title: "실시간 안내 · 안심 귀갓길" },
-      { name: "description", content: "GPS 실시간 안내로 안전 경로를 따라가세요." },
-      { property: "og:title", content: "실시간 안내" },
-      { property: "og:description", content: "GPS 기반 턴바이턴 네비게이션" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
-  component: Navigate,
-});
+export function NavigateRoute() {
+  const navigate = useNavigate();
+  const [transportMode, setTransportMode] = useState<'WALK' | 'CAR'>('WALK');
+  const [startPoint, setStartPoint] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [endPoint, setEndPoint] = useState<{ name: string; lat: number; lng: number } | null>(null);
 
-function distance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371000;
-  const toR = (d: number) => (d * Math.PI) / 180;
-  const dLat = toR(b.lat - a.lat);
-  const dLon = toR(b.lng - a.lng);
-  const s1 = Math.sin(dLat / 2) ** 2;
-  const s2 = Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s1 + s2));
-}
+  // 임시 기본 좌표 (출발지/목적지 미지정 시 기본 위치)
+  const defaultStart = { name: '현재 위치', lat: 37.5559, lng: 126.9723 };
+  const defaultEnd = { name: '목적지', lat: 37.5665, lng: 126.9780 };
 
-function Navigate() {
-  const nav = useNavigate();
-  const { routes, selectedRouteId, destination, currentPosition, setCurrentPosition } = useRouteStore();
-  const { guardianPhone } = useGuardian();
-  const setWardPosition = useWardTrack((s) => s.setWardPosition);
+  const currentStart = startPoint || defaultStart;
+  const currentEnd = endPoint || defaultEnd;
 
-  const route = routes.find((r) => r.id === selectedRouteId);
-  const isDriving = (route as any)?.travelMode === "DRIVING";
+  // 도보/차량 모드에 따른 경로 옵션 생성
+  const routeOptions = generateRouteOptions(
+    { lat: currentStart.lat, lng: currentStart.lng },
+    { lat: currentEnd.lat, lng: currentEnd.lng },
+    transportMode
+  );
 
-  const mapDiv = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const meMarkerRef = useRef<any>(null);
-  const [stepIndex, setStepIndex] = useState(0);
-  const [arrived, setArrived] = useState(false);
-  const [tracks, setTracks] = useState<{ lat: number; lng: number }[]>([]);
-  const watchIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!route) {
-      nav({ to: "/" });
-      return;
-    }
-    let cancelled = false;
-
-    loadKakaoMaps().then((kakao) => {
-      if (cancelled || !mapDiv.current) return;
-      const start = route.path[0];
-      const startLatLng = new kakao.maps.LatLng(start.lat, start.lng);
-
-      const map = new kakao.maps.Map(mapDiv.current, {
-        center: startLatLng,
-        level: isDriving ? 4 : 3,
-      });
-      mapRef.current = map;
-
-      const linePath = route.path.map(
-        (p: any) => new kakao.maps.LatLng(p.lat, p.lng)
-      );
-      new kakao.maps.Polyline({
-        path: linePath,
-        strokeWeight: 8,
-        strokeColor: route.color || "#3b82f6",
-        strokeOpacity: 0.9,
-        strokeStyle: "solid",
-        map: map,
-      });
-
-      if (destination) {
-        new kakao.maps.Marker({
-          position: new kakao.maps.LatLng(destination.lat, destination.lng),
-          map: map,
-        });
-      }
-
-      meMarkerRef.current = new kakao.maps.Marker({
-        position: startLatLng,
-        map: map,
-      });
-    });
-
-    if (navigator.geolocation) {
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setCurrentPosition(p);
-          setWardPosition(p, destination?.name ?? null);
-          setTracks((prev) => [...prev, p]);
-
-          if (mapRef.current && meMarkerRef.current && window.kakao) {
-            const currentLatLng = new window.kakao.maps.LatLng(p.lat, p.lng);
-            meMarkerRef.current.setPosition(currentLatLng);
-            mapRef.current.panTo(currentLatLng);
-          }
-        },
-        (err) => console.warn("geolocation err", err),
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
-      );
-    }
-    return () => {
-      cancelled = true;
-      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
-  }, [route]);
-
-  useEffect(() => {
-    if (!route || !currentPosition) return;
-    const currentStep = route.steps[stepIndex];
-    if (!currentStep) return;
-    const threshold = isDriving ? 30 : 20;
-
-    if (distance(currentPosition, currentStep.endLocation) < threshold) {
-      if (stepIndex + 1 >= route.steps.length) {
-        setArrived(true);
-      } else {
-        setStepIndex((i) => i + 1);
-      }
-    }
-  }, [currentPosition, stepIndex, route, isDriving]);
-
-  if (!route) return null;
-  const step = route.steps[stepIndex];
-  const remainingMeters = route.steps.slice(stepIndex).reduce((s, x) => s + x.distanceMeters, 0);
-
-  // 차량 모드(평균 30km/h)와 도보 모드(평균 4km/h) 속도를 반영하여 다른 지도 앱과 시간 오차 보정
-  const calculatedSec = isDriving 
-    ? (remainingMeters / (30000 / 3600)) 
-    : (remainingMeters / (4000 / 3600));
-  const remainingSec = Math.max(route.steps.slice(stepIndex).reduce((s, x) => s + x.durationSeconds, 0), Math.round(calculatedSec));
+  const selectedRoute = routeOptions[0] || { distance: 0, duration: 0 };
+  const distanceKm = (selectedRoute.distance / 1000).toFixed(1);
 
   return (
-    <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
-      <div className="bg-primary p-4 text-primary-foreground">
-        <div className="mb-1 flex items-center justify-between text-xs opacity-80">
-          <span className="font-semibold">{isDriving ? "🚗 차량 경로 안내 (주행 중)" : "🚶 도보 경로 안내 (보행 중)"}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-4xl font-black">
-            {step?.maneuver?.includes("left") ? "↰" : step?.maneuver?.includes("right") ? "↱" : "↑"}
-          </div>
-          <div className="flex-1">
-            <div className="text-lg font-bold leading-tight">
-              {step?.instruction || "목적지 근처입니다"}
-            </div>
-            <div className="mt-1 text-xs opacity-90">
-              {step?.distanceMeters}m 앞
-            </div>
-          </div>
-          <Link to="/routes" aria-label="종료" className="text-2xl">✕</Link>
-        </div>
-      </div>
-
-      <div className="relative flex-1">
-        <div ref={mapDiv} className="h-full w-full" />
-        {guardianPhone && (
-          <div className="absolute left-3 top-3 rounded-full bg-safe/90 px-3 py-1 text-[10px] font-bold text-white shadow">
-            👥 보호자 실시간 공유 중 · {tracks.length}지점
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-border bg-card p-3">
-        <div className="flex items-center justify-between text-xs">
-          <div>
-            <div className="text-muted-foreground">남은 거리</div>
-            <div className="text-base font-bold text-foreground">
-              {(remainingMeters / 1000).toFixed(2)}km
-            </div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">예상 소요 시간</div>
-            <div className="text-base font-bold text-foreground">
-              {Math.round(remainingSec / 60)}분
-            </div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">단계</div>
-            <div className="text-base font-bold text-foreground">
-              {stepIndex + 1}/{route.steps.length}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {arrived && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-safe/95">
-          <div className="rounded-3xl bg-white p-8 text-center shadow-2xl">
-            <div className="text-6xl">🎉</div>
-            <h2 className="mt-3 text-xl font-black text-foreground">도착했어요!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">안전하게 목적지에 도착하셨습니다.</p>
-            <Link
-              to="/"
-              className="mt-6 inline-block rounded-full bg-primary px-6 py-2 text-sm font-bold text-primary-foreground"
+    <div className="flex flex-col h-screen w-full relative overflow-hidden bg-background">
+      {/* 상단 네비게이션 및 모드 선택 컨트롤 바 */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex flex-col gap-2">
+        <div className="bg-white/95 backdrop-blur-md p-3 rounded-xl shadow-lg border flex items-center justify-between">
+          <h1 className="font-bold text-base text-gray-800">안심 경로 안내</h1>
+          
+          {/* 도보 / 차량 선택 버튼 */}
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setTransportMode('WALK')}
+              className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                transportMode === 'WALK'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
             >
-              홈으로
-            </Link>
+              도보
+            </button>
+            <button
+              onClick={() => setTransportMode('CAR')}
+              className={`px-3 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                transportMode === 'CAR'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              차량
+            </button>
           </div>
         </div>
-      )}
+
+        {/* 경로 요약 정보 카드 */}
+        <div className="bg-white/95 backdrop-blur-md p-3 rounded-xl shadow-md border flex items-center justify-between text-sm">
+          <div>
+            <span className="text-gray-500">거리: </span>
+            <span className="font-bold text-gray-800">{distanceKm} km</span>
+          </div>
+          <div>
+            <span className="text-gray-500">예상 시간: </span>
+            <span className="font-bold text-blue-600 text-base">{selectedRoute.duration} 분</span>
+          </div>
+          <div>
+            <span className="text-gray-500">안심 지수: </span>
+            <span className="font-bold text-emerald-600">{selectedRoute.safetyScore}점</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 지도 영역 */}
+      <div className="flex-1 w-full h-full relative">
+        <MapView mode={transportMode} start={currentStart} end={currentEnd} />
+      </div>
     </div>
   );
 }
