@@ -73,6 +73,15 @@
               "type": "number",
               "description": "Longitude of the destination."
             },
+            "travelMode": {
+              "default": "WALKING",
+              "description": "Travel mode: WALKING for pedestrian, DRIVING for vehicle.",
+              "type": "string",
+              "enum": [
+                "WALKING",
+                "DRIVING"
+              ]
+            },
             "includeSteps": {
               "type": "boolean",
               "description": "Include turn-by-turn steps for each route. Defaults to false."
