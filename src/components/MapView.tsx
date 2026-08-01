@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadKakaoMaps } from "@/lib/gmaps";
 
 export interface MapViewProps {
@@ -20,6 +20,7 @@ export function MapView({ mode = "WALK", start, end, path, onMap }: MapViewProps
   const mapRef = useRef<any>(null);
   const overlaysRef = useRef<any[]>([]);
   const kakaoRef = useRef<any>(null);
+  const [loadError, setLoadError] = useState(false);
 
   // 지도 1회 초기화 (모바일 브라우저에서도 SDK 로드를 보장)
   useEffect(() => {
@@ -41,7 +42,10 @@ export function MapView({ mode = "WALK", start, end, path, onMap }: MapViewProps
           map.setCenter(new kakaoMaps.LatLng(center.lat, center.lng));
         }, 300);
       })
-      .catch((e) => console.error("지도 로드 실패", e));
+      .catch((e) => {
+        console.error("지도 로드 실패", e);
+        setLoadError(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -99,7 +103,19 @@ export function MapView({ mode = "WALK", start, end, path, onMap }: MapViewProps
     };
   }, []);
 
-  return <div ref={containerRef} className="absolute inset-0 h-full w-full bg-neutral-100" />;
+  return (
+    <div className="absolute inset-0 h-full w-full bg-neutral-100">
+      <div ref={containerRef} className="h-full w-full" />
+      {loadError && (
+        <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-xs leading-relaxed text-muted-foreground">
+          지도를 불러오지 못했어요.
+          <br />
+          카카오 개발자 콘솔 → 내 애플리케이션 → 플랫폼 → Web 에<br />
+          현재 접속 중인 주소를 사이트 도메인으로 등록해주세요.
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default MapView;
