@@ -1,135 +1,168 @@
-// src/lib/routes.core.ts
+// 카카오모빌리티 길찾기 기반 경로 계산 코어 (서버 · MCP 공용)
 
-import policeData from '@/data/police.json';
-import safetyData from '@/data/safety.json';
+export type TravelMode = "WALKING" | "DRIVING";
 
-export interface Coordinate {
-  lat: number;
-  lng: number;
+export type RouteStepDTO = {
+  instruction: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  startLocation: { lat: number; lng: number };
+  endLocation: { lat: number; lng: number };
+};
+
+export type RouteDTO = {
+  path: { lat: number; lng: number }[];
+  distanceMeters: number;
+  durationSeconds: number;
+  travelMode: TravelMode;
+  steps: RouteStepDTO[];
+};
+
+type KakaoGuide = {
+  name?: string;
+  x: number;
+  y: number;
+  distance?: number;
+  duration?: number;
+  type?: number;
+  guidance?: string;
+};
+
+type KakaoRoute = {
+  result_code?: number;
+  result_msg?: string;
+  summary?: { distance?: number; duration?: number };
+  sections?: Array<{
+    roads?: Array<{ vertexes?: number[] }>;
+    guides?: KakaoGuide[];
+  }>;
+};
+
+const KAKAO_URL = "https://apis-navi.kakaomobility.com/v1/directions";
+
+/**
+ * 도보 속도: 카카오맵 보행자 안내 기준(약 4km/h ≒ 1.11m/s).
+ * 신호 대기·횡단보도 지연을 반영해 8% 여유를 더한다.
+ */
+const WALK_MPS = 4000 / 3600;
+const WALK_OVERHEAD = 1.08;
+
+function walkDuration(distanceMeters: number) {
+  return Math.max(60, Math.round((distanceMeters / WALK_MPS) * WALK_OVERHEAD));
 }
 
-export interface RouteOption {
-  id: string;
-  title: string;
-  mode: 'WALK' | 'CAR';
-  distance: number;
-  duration: number;
-  safetyScore: number;
-  path: Coordinate[];
-  description: string;
-}
-
-// Haversine formula를 이용한 두 좌표 간 거리 계산 (미터 단위)
-export function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c;
-}
-
-// 도보/차량 선택 모드에 따른 이동 시간(분) 계산 함수
-export function calculateDuration(distanceMeters: number, mode: 'WALK' | 'CAR'): number {
-  const speedMetersPerMinute = mode === 'WALK' ? 67 : 500;
-  const durationMinutes = Math.ceil(distanceMeters / speedMetersPerMinute);
-  return Math.max(durationMinutes, 1);
-}
-
-// 주변 경찰서 및 안심 시설 데이터를 활용한 안전 지수 산출 로직
-export function calculateSafetyScore(path: Coordinate[]): number {
-  let score = 70;
-
-  if (!path || !Array.isArray(path) || path.length === 0) return score;
-
-  path.forEach((point) => {
-    if (policeData && Array.isArray(policeData)) {
-      policeData.forEach((police: any) => {
-        if (police && typeof police.lat === 'number' && typeof police.lng === 'number') {
-          const dist = calculateDistance(point.lat, point.lng, police.lat, police.lng);
-          if (dist < 200) {
-            score += 5;
-          }
-        }
-      });
+function toDTO(r: KakaoRoute, mode: TravelMode): RouteDTO | null {
+  if (r.result_code !== 0) return null;
+  const path: { lat: number; lng: number }[] = [];
+  const guides: KakaoGuide[] = [];
+  for (const section of r.sections ?? []) {
+    for (const road of section.roads ?? []) {
+      const v = road.vertexes ?? [];
+      for (let i = 0; i + 1 < v.length; i += 2) path.push({ lng: v[i], lat: v[i + 1] });
     }
+    guides.push(...(section.guides ?? []));
+  }
+  if (path.length < 2) return null;
 
-    if (safetyData && Array.isArray(safetyData)) {
-      safetyData.forEach((facility: any) => {
-        if (facility && typeof facility.lat === 'number' && typeof facility.lng === 'number') {
-          const dist = calculateDistance(point.lat, point.lng, facility.lat, facility.lng);
-          if (dist < 100) {
-            score += 2;
-          }
-        }
-      });
-    }
+  const distanceMeters = Math.round(r.summary?.distance ?? 0);
+  // 차량: 카카오가 실시간 교통을 반영해 준 소요 시간을 그대로 사용
+  // 도보: 같은 경로 거리를 보행 속도로 환산
+  const durationSeconds =
+    mode === "DRIVING"
+      ? Math.max(60, Math.round(r.summary?.duration ?? 0))
+      : walkDuration(distanceMeters);
+
+  const rawSteps = guides.filter((g) => (g.distance ?? 0) > 0 || g.guidance);
+  const steps: RouteStepDTO[] = rawSteps.map((g, i, arr) => {
+    const next = arr[i + 1] ?? g;
+    const stepDist = Math.round(g.distance ?? 0);
+    return {
+      instruction: g.guidance || g.name || "직진",
+      distanceMeters: stepDist,
+      durationSeconds:
+        mode === "DRIVING" ? Math.round(g.duration ?? 0) : walkDuration(stepDist),
+      startLocation: { lat: g.y, lng: g.x },
+      endLocation: { lat: next.y, lng: next.x },
+    };
   });
 
-  return Math.min(Math.max(score, 10), 100);
+  return { path, distanceMeters, durationSeconds, travelMode: mode, steps };
 }
 
-// 종합 경로 옵션 생성 함수
-export function generateRouteOptions(
-  start: Coordinate,
-  end: Coordinate,
-  mode: 'WALK' | 'CAR' = 'WALK'
-): RouteOption[] {
-  if (!start || !end) return [];
+export async function callKakao(
+  key: string,
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  priority: "RECOMMEND" | "TIME" | "DISTANCE",
+  mode: TravelMode = "WALKING",
+): Promise<RouteDTO[]> {
+  const params = new URLSearchParams({
+    origin: `${origin.lng},${origin.lat}`,
+    destination: `${destination.lng},${destination.lat}`,
+    priority,
+    alternatives: "true",
+    road_details: "false",
+    car_type: "1",
+  });
 
-  const directDistance = calculateDistance(start.lat, start.lng, end.lat, end.lng);
-  
-  const midPoint: Coordinate = {
-    lat: (start.lat + end.lat) / 2 + 0.001,
-    lng: (start.lng + end.lng) / 2 - 0.001,
-  };
+  const res = await fetch(`${KAKAO_URL}?${params.toString()}`, {
+    headers: { Authorization: `KakaoAK ${key}` },
+  });
 
-  const directPath = [start, end];
-  const safePath = [start, midPoint, end];
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Kakao directions failed [${res.status}]: ${body}`);
+    throw new Error(`카카오 경로 계산 실패 (${res.status})`);
+  }
 
-  const directDuration = calculateDuration(directDistance, mode);
-  const safeDistance = directDistance * 1.2;
-  const safeDuration = calculateDuration(safeDistance, mode);
-
-  const directSafetyScore = calculateSafetyScore(directPath);
-  const safeSafetyScore = calculateSafetyScore(safePath);
-
-  return [
-    {
-      id: 'safe-1',
-      title: '안심 추천 경로',
-      mode: mode,
-      distance: Math.round(safeDistance),
-      duration: safeDuration,
-      safetyScore: Math.min(safeSafetyScore + 15, 95),
-      path: safePath,
-      description: 'CCTV와 방범 시설이 인접하여 야간에도 안전한 경로입니다.',
-    },
-    {
-      id: 'fast-1',
-      title: '최단 거리 경로',
-      mode: mode,
-      distance: Math.round(directDistance),
-      duration: directDuration,
-      safetyScore: directSafetyScore,
-      path: directPath,
-      description: '목적지까지 가장 빠르게 도달할 수 있는 직선 위주의 경로입니다.',
-    },
-  ];
+  const json = (await res.json()) as { routes?: KakaoRoute[] };
+  return (json.routes ?? []).map((r) => toDTO(r, mode)).filter((r): r is RouteDTO => r !== null);
 }
 
-// 외부 함수(routes.functions.ts 등)에서 요구하는 호환용 함수 추가
-export function computeRoutes(start: Coordinate, end: Coordinate, mode: 'WALK' | 'CAR' = 'WALK'): RouteOption[] {
-  return generateRouteOptions(start, end, mode);
+function requireKey() {
+  const key = process.env.KAKAO_REST_API_KEY;
+  if (!key) throw new Error("카카오 REST API 키가 설정되지 않았습니다.");
+  return key;
 }
 
-export function computeFastest(start: Coordinate, end: Coordinate, mode: 'WALK' | 'CAR' = 'WALK'): RouteOption {
-  const options = generateRouteOptions(start, end, mode);
-  return options.find(opt => opt.id === 'fast-1') || options[0];
+export async function computeRoutes(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  opts: { mode?: TravelMode } = {},
+): Promise<{ routes: RouteDTO[]; travelMode: TravelMode }> {
+  const key = requireKey();
+  const mode: TravelMode = opts.mode ?? "WALKING";
+
+  const results = await Promise.all(
+    (["RECOMMEND", "TIME", "DISTANCE"] as const).map((p) =>
+      callKakao(key, origin, destination, p, mode).catch((e) => {
+        console.error(e);
+        return [] as RouteDTO[];
+      }),
+    ),
+  );
+
+  const seen = new Set<string>();
+  const routes: RouteDTO[] = [];
+  for (const r of results.flat()) {
+    const sig = `${r.distanceMeters}-${r.durationSeconds}`;
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    routes.push(r);
+  }
+
+  if (routes.length === 0) throw new Error("경로를 찾지 못했습니다.");
+  return { routes, travelMode: mode };
+}
+
+export async function computeFastest(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  opts: { mode?: TravelMode } = {},
+): Promise<{ route: RouteDTO | null; travelMode: TravelMode }> {
+  const key = requireKey();
+  const mode: TravelMode = opts.mode ?? "DRIVING";
+  const routes = await callKakao(key, origin, destination, "TIME", mode);
+  const fastest = routes.sort((a, b) => a.durationSeconds - b.durationSeconds)[0] ?? null;
+  return { route: fastest, travelMode: mode };
 }

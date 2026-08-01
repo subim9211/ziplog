@@ -8,6 +8,8 @@ export type Place = {
   lng: number;
 };
 
+export type TravelMode = "WALKING" | "DRIVING";
+
 export type SafeRoute = {
   id: string;
   label: string;
@@ -21,6 +23,7 @@ export type SafeRoute = {
   policeNearby: number;
   safetyFacilities: number;
   facilityDataAvailable?: boolean;
+  travelMode: TravelMode;
 };
 
 export type RouteStep = {
@@ -42,6 +45,8 @@ type PersistState = {
 type SessionState = {
   origin: Place | null;
   destination: Place | null;
+  travelMode: TravelMode;
+  setTravelMode: (m: TravelMode) => void;
   setOrigin: (p: Place | null) => void;
   setDestination: (p: Place | null) => void;
   routes: SafeRoute[];
@@ -94,6 +99,8 @@ export const useWardTrack = create<WardTrackState>()(
 export const useRouteStore = create<SessionState>((set) => ({
   origin: null,
   destination: null,
+  travelMode: "WALKING",
+  setTravelMode: (travelMode) => set({ travelMode, routes: [], selectedRouteId: null }),
   setOrigin: (origin) => set({ origin }),
   setDestination: (destination) => set({ destination }),
   routes: [],

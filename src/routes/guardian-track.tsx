@@ -75,7 +75,7 @@ function GuardianTrack() {
     let cancelled = false;
     setLoading(true);
 
-    fastest({ data: { origin: myPos, destination: wardPos } })
+    fastest({ data: { origin: myPos, destination: wardPos, mode: "DRIVING" } })
       .then(({ route: r }) => {
         if (cancelled) return;
         setRoute(r);

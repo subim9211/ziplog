@@ -17,7 +17,7 @@ export function loadKakaoMaps(): Promise<any> {
     }
 
     const script = document.createElement("script");
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appkey}&autoload=false&libraries=services`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appkey}&autoload=false&libraries=services`;
     script.async = true;
     script.onerror = () => reject(new Error("카카오 지도 SDK 로드 실패"));
     script.onload = () => {

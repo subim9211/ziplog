@@ -87,10 +87,8 @@ function RoutesPage() {
             endLocation: s.endLocation,
           }));
 
-          // 차량 모드일 때는 시속 30km(약 8.33m/s), 도보 모드일 때는 시속 4km(약 1.11m/s) 기준으로 정확한 소요 시간 재계산
-          const speedMps = travelMode === "DRIVING" ? (30000 / 3600) : (4000 / 3600);
-          const calculatedDuration = Math.round(r.distanceMeters / speedMps);
-          const finalDurationSeconds = travelMode === "DRIVING" ? calculatedDuration : Math.max(r.durationSeconds, calculatedDuration);
+          // 소요 시간은 카카오 길찾기 결과(차량: 실시간 교통 반영 / 도보: 카카오 보행 속도 환산)를 그대로 사용
+          const finalDurationSeconds = r.durationSeconds;
 
           let bias = 0;
           if (layer.id === "safest") bias = 15;
@@ -232,6 +230,24 @@ function RoutesPage() {
           })}
         </div>
       </div>
+
+      {selectedRouteId && (
+        <div className="grid grid-cols-2 gap-2 border-t border-border bg-card p-3">
+          <Link
+            to="/route-detail"
+            className="rounded-full bg-secondary py-3 text-center text-sm font-bold text-foreground"
+          >
+            📋 상세 경로(길찾기)
+          </Link>
+          <Link
+            to="/navigate"
+            className="rounded-full bg-primary py-3 text-center text-sm font-bold text-primary-foreground"
+          >
+            {travelMode === "DRIVING" ? "🚗 안내 시작" : "🚶 안내 시작"}
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
+
