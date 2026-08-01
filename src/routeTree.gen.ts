@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as RoutesRouteImport } from './routes/routes'
 import { Route as RouteDetailRouteImport } from './routes/route-detail'
-import { Route as NavigateRouteImport } from './routes/navigate'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as GuardianTrackRouteImport } from './routes/guardian-track'
 import { Route as GuardianRouteImport } from './routes/guardian'
@@ -34,11 +33,6 @@ const RoutesRoute = RoutesRouteImport.update({
 const RouteDetailRoute = RouteDetailRouteImport.update({
   id: '/route-detail',
   path: '/route-detail',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NavigateRoute = NavigateRouteImport.update({
-  id: '/navigate',
-  path: '/navigate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -85,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/guardian': typeof GuardianRoute
   '/guardian-track': typeof GuardianTrackRoute
   '/mcp': typeof McpRoute
-  '/navigate': typeof NavigateRoute
   '/route-detail': typeof RouteDetailRoute
   '/routes': typeof RoutesRoute
   '/security': typeof SecurityRoute
@@ -98,7 +91,6 @@ export interface FileRoutesByTo {
   '/guardian': typeof GuardianRoute
   '/guardian-track': typeof GuardianTrackRoute
   '/mcp': typeof McpRoute
-  '/navigate': typeof NavigateRoute
   '/route-detail': typeof RouteDetailRoute
   '/routes': typeof RoutesRoute
   '/security': typeof SecurityRoute
@@ -112,7 +104,6 @@ export interface FileRoutesById {
   '/guardian': typeof GuardianRoute
   '/guardian-track': typeof GuardianTrackRoute
   '/mcp': typeof McpRoute
-  '/navigate': typeof NavigateRoute
   '/route-detail': typeof RouteDetailRoute
   '/routes': typeof RoutesRoute
   '/security': typeof SecurityRoute
@@ -127,7 +118,6 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/guardian-track'
     | '/mcp'
-    | '/navigate'
     | '/route-detail'
     | '/routes'
     | '/security'
@@ -140,7 +130,6 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/guardian-track'
     | '/mcp'
-    | '/navigate'
     | '/route-detail'
     | '/routes'
     | '/security'
@@ -153,7 +142,6 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/guardian-track'
     | '/mcp'
-    | '/navigate'
     | '/route-detail'
     | '/routes'
     | '/security'
@@ -167,7 +155,6 @@ export interface RootRouteChildren {
   GuardianRoute: typeof GuardianRoute
   GuardianTrackRoute: typeof GuardianTrackRoute
   McpRoute: typeof McpRoute
-  NavigateRoute: typeof NavigateRoute
   RouteDetailRoute: typeof RouteDetailRoute
   RoutesRoute: typeof RoutesRoute
   SecurityRoute: typeof SecurityRoute
@@ -197,13 +184,6 @@ declare module '@tanstack/react-router' {
       path: '/route-detail'
       fullPath: '/route-detail'
       preLoaderRoute: typeof RouteDetailRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/navigate': {
-      id: '/navigate'
-      path: '/navigate'
-      fullPath: '/navigate'
-      preLoaderRoute: typeof NavigateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -263,7 +243,6 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianRoute: GuardianRoute,
   GuardianTrackRoute: GuardianTrackRoute,
   McpRoute: McpRoute,
-  NavigateRoute: NavigateRoute,
   RouteDetailRoute: RouteDetailRoute,
   RoutesRoute: RoutesRoute,
   SecurityRoute: SecurityRoute,
