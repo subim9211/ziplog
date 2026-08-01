@@ -24,12 +24,13 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const nav = useNavigate();
-  const { origin, destination, setOrigin, setDestination, reset } = useRouteStore();
+  const { origin, destination, setOrigin, setDestination, reset, travelMode, setTravelMode } =
+    useRouteStore();
   const { guardianPhone } = useGuardian();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [locating, setLocating] = useState(false);
-  const mapRef = useRef<google.maps.Map | null>(null);
+  const mapRef = useRef<any>(null);
 
   // Get user location for "current location" origin
   const useCurrentLocation = () => {
@@ -62,7 +63,10 @@ function Home() {
       {/* Cute map */}
       <div className="absolute inset-0">
         <MapView
-          onMap={(m) => {
+          start={origin ?? undefined}
+          end={destination ?? undefined}
+          mode={travelMode === "DRIVING" ? "CAR" : "WALK"}
+          onMap={(m: any) => {
             mapRef.current = m;
           }}
         />
@@ -124,13 +128,35 @@ function Home() {
       </div>
 
       {/* Search button appears when both set */}
+      {/* 이동 수단 선택 (도보 / 차량) */}
+      <div className="absolute inset-x-0 top-[152px] z-20 flex justify-center px-4">
+        <div className="flex gap-1 rounded-full bg-white/95 p-1 shadow-lg">
+          <button
+            onClick={() => setTravelMode("WALKING")}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              travelMode === "WALKING" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            🚶 도보
+          </button>
+          <button
+            onClick={() => setTravelMode("DRIVING")}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              travelMode === "DRIVING" ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            🚗 차량(택시)
+          </button>
+        </div>
+      </div>
+
       {canSearch && (
-        <div className="absolute inset-x-0 top-[168px] z-20 flex justify-center px-4">
+        <div className="absolute inset-x-0 top-[196px] z-20 flex justify-center px-4">
           <button
             onClick={() => nav({ to: "/routes" })}
             className="w-full max-w-sm rounded-full bg-primary py-3 text-sm font-bold text-primary-foreground shadow-lg active:scale-95"
           >
-            🛡️ 안전 경로 4개 찾기
+            🛡️ {travelMode === "DRIVING" ? "차량" : "도보"} 안전 경로 4개 찾기
           </button>
         </div>
       )}
