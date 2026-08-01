@@ -230,6 +230,24 @@ function RoutesPage() {
           })}
         </div>
       </div>
+
+      {selectedRouteId && (
+        <div className="grid grid-cols-2 gap-2 border-t border-border bg-card p-3">
+          <Link
+            to="/route-detail"
+            className="rounded-full bg-secondary py-3 text-center text-sm font-bold text-foreground"
+          >
+            📋 상세 경로(길찾기)
+          </Link>
+          <Link
+            to="/navigate"
+            className="rounded-full bg-primary py-3 text-center text-sm font-bold text-primary-foreground"
+          >
+            {travelMode === "DRIVING" ? "🚗 안내 시작" : "🚶 안내 시작"}
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
+
